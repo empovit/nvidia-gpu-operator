@@ -3144,6 +3144,32 @@ func transformDriverContainer(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicy
 		driverContainer.Image = image
 	}
 
+	entitlementOptional := true
+	entitlementVolMount := corev1.VolumeMount{Name: "entitlement", ReadOnly: true, MountPath: "/etc/pki/entitlement"}
+	extraReposVolMount := corev1.VolumeMount{Name: "extra-repos", ReadOnly: true, MountPath: "/etc/yum.repos.d/extras.repo", SubPath: "extras.repo"}
+	driverContainer.VolumeMounts = append(driverContainer.VolumeMounts, entitlementVolMount, extraReposVolMount)
+	entitlementVolume := corev1.Volume{Name: "entitlement", VolumeSource: corev1.VolumeSource{
+		Secret: &corev1.SecretVolumeSource{
+			SecretName: "etc-pki-entitlement",
+			Optional:   &entitlementOptional,
+		},
+	}}
+	extraReposVolume := corev1.Volume{Name: "extra-repos", VolumeSource: corev1.VolumeSource{
+		ConfigMap: &corev1.ConfigMapVolumeSource{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: "extra-build-repos",
+			},
+			Items: []corev1.KeyToPath{
+				{
+					Key:  "extras.repo",
+					Path: "extras.repo",
+				},
+			},
+			Optional: &entitlementOptional,
+		},
+	}}
+	podSpec.Volumes = append(podSpec.Volumes, entitlementVolume, extraReposVolume)
+
 	// update image pull policy
 	driverContainer.ImagePullPolicy = gpuv1.ImagePullPolicy(config.Driver.ImagePullPolicy)
 
